@@ -61,6 +61,16 @@
     details.setup{margin-top:22px;border:1px dashed #b8c5d6;border-radius:12px;padding:14px;background:#fafcff}
     details.setup summary{cursor:pointer;font-weight:700;color:var(--primary)}
     pre.code{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:14px;border-radius:10px;overflow:auto;font-size:12px;max-height:300px}
+
+    .refs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:12px}
+    .ref-card{border:1px solid var(--line);border-radius:12px;padding:16px;background:#fff}
+    .ref-card h4{margin:0 0 8px;font-size:15px;line-height:1.45}
+    .ref-card p{margin:8px 0;color:var(--muted);font-size:13px;line-height:1.6}
+    .ref-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+    .ref-priority{font-size:11px;font-weight:700;padding:3px 7px;border-radius:999px;background:#fff4e5;color:#a15c00}
+    .ref-link{display:inline-block;margin-top:8px;color:var(--primary);font-weight:700;text-decoration:none}
+    .ref-link:hover{text-decoration:underline}
+
     @media(max-width:850px){
       .layout{grid-template-columns:1fr}
       .sidebar{position:static;max-height:none}.doc-list{max-height:330px}
@@ -232,7 +242,69 @@
         <h3>문서 내용</h3>
         <div class="doc-body">${escapeHtml(selectedDoc.content || '저장된 본문이 없습니다.')}</div>
       </div>
+
+      <div class="section">
+        <h3>추천 참고자료</h3>
+        <div id="referenceList" style="color:var(--muted)">추천자료를 불러오는 중...</div>
+      </div>
     `;
+
+    loadReferencesForDoc(selectedDoc.id);
+  }
+
+  async function loadReferencesForDoc(docId) {
+    const box = $('referenceList');
+    if (!box) return;
+
+    try {
+      const linkUrl =
+        `${SUPABASE_URL}/rest/v1/doc_reference_links` +
+        `?select=priority,relevance_note,reference_materials(id,title,material_type,publisher,source_url,description)` +
+        `&doc_id=eq.${docId}&order=priority.asc`;
+
+      const res = await fetch(linkUrl, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!res.ok) throw new Error(`추천자료 조회 실패 (${res.status})`);
+
+      const rows = await res.json();
+
+      if (!rows.length) {
+        box.innerHTML = '<div style="padding:14px 0;color:#6b778c">연결된 추천 참고자료가 없습니다.</div>';
+        return;
+      }
+
+      box.className = 'refs-grid';
+      box.innerHTML = rows.map(row => {
+        const r = row.reference_materials || {};
+        const stars = row.priority === 1 ? '우선 추천' : row.priority === 2 ? '추천' : '참고';
+        return `
+          <article class="ref-card">
+            <div class="ref-meta">
+              <span class="badge">${escapeHtml((r.material_type || 'reference').toUpperCase())}</span>
+              <span class="ref-priority">${escapeHtml(stars)}</span>
+            </div>
+
+            <h4>${escapeHtml(r.title || '제목 없음')}</h4>
+
+            ${r.publisher ? `<p><b>발행/제공:</b> ${escapeHtml(r.publisher)}</p>` : ''}
+            ${row.relevance_note ? `<p><b>추천 이유:</b> ${escapeHtml(row.relevance_note)}</p>` : ''}
+            ${r.description ? `<p>${escapeHtml(r.description)}</p>` : ''}
+
+            ${r.source_url ? `<a class="ref-link" href="${safeExternalUrl(r.source_url)}" target="_blank" rel="noopener noreferrer">원문 보기 ↗</a>` : ''}
+          </article>
+        `;
+      }).join('');
+
+    } catch (e) {
+      box.className = '';
+      box.innerHTML = `<div class="error">추천자료를 불러오지 못했습니다: ${escapeHtml(e.message)}</div>`;
+    }
   }
 
   function buildFallbackSummary(text) {
@@ -329,6 +401,17 @@ ${selectedDoc.drive_url || ''}`
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));
   }
+
+
+  function safeExternalUrl(v='') {
+    try {
+      const u = new URL(v);
+      return ['http:','https:'].includes(u.protocol) ? u.href : '#';
+    } catch {
+      return '#';
+    }
+  }
+
 
   function safeUrl(v='') {
     return /^https:\/\/(drive|docs)\.google\.com\//.test(v) ? v.replace(/'/g,'%27') : '#';
