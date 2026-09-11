@@ -216,7 +216,7 @@
     renderList();
 
     const summary = selectedDoc.summary?.trim()
-      || buildFallbackSummary(selectedDoc.content || '');
+      || '등록된 요약이 없습니다.';
 
     $('detail').className = '';
     $('detail').innerHTML = `
@@ -307,11 +307,6 @@
     }
   }
 
-  function buildFallbackSummary(text) {
-    const cleaned = text.replace(/\s+/g,' ').trim();
-    if (!cleaned) return '등록된 요약이 없습니다.';
-    return cleaned.length > 240 ? cleaned.slice(0, 240) + '…' : cleaned;
-  }
 
   function openSchedule() {
     $('modalMsg').textContent = '';
