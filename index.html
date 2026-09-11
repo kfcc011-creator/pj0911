@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>업무문서 관리</title>
+  <style>
+    :root{
+      --bg:#f4f7fb; --panel:#ffffff; --line:#dde5ef; --text:#152238;
+      --muted:#6b778c; --primary:#005bac; --primary2:#0a72ce; --danger:#b42318;
+      --shadow:0 10px 28px rgba(21,34,56,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}
+    button,input,textarea{font:inherit}
+    .app{min-height:100vh;display:grid;grid-template-rows:auto 1fr}
+    header{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:10}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:20px}
+    .logo{width:36px;height:36px;border-radius:10px;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800}
+    .header-actions{display:flex;gap:10px}
+    .btn{border:0;border-radius:10px;padding:10px 15px;cursor:pointer;font-weight:700}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-primary:hover{background:var(--primary2)}
+    .btn-light{background:#eef4fa;color:var(--primary)}
+    .layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:18px;padding:18px;max-width:1500px;width:100%;margin:0 auto}
+    .sidebar,.content{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+    .sidebar{overflow:hidden;align-self:start;position:sticky;top:90px;max-height:calc(100vh - 108px)}
+    .side-head{padding:18px;border-bottom:1px solid var(--line)}
+    .side-head h2{font-size:18px;margin:0 0 12px}
+    .search{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;outline:none}
+    .search:focus{border-color:var(--primary)}
+    .doc-list{overflow:auto;max-height:calc(100vh - 205px)}
+    .doc-item{padding:15px 18px;border-bottom:1px solid #edf1f6;cursor:pointer}
+    .doc-item:hover,.doc-item.active{background:#f0f6fc}
+    .doc-item .title{font-weight:700;line-height:1.4}
+    .meta{display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--muted);font-size:12px;flex-wrap:wrap}
+    .badge{padding:3px 7px;background:#edf4fb;color:var(--primary);border-radius:999px;font-weight:700}
+    .content{padding:26px;min-height:650px}
+    .empty{height:580px;display:grid;place-items:center;text-align:center;color:var(--muted)}
+    .doc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding-bottom:18px}
+    .doc-head h1{font-size:25px;margin:0 0 10px}
+    .section{margin-top:24px}
+    .section h3{font-size:16px;margin:0 0 10px}
+    .summary{background:#f3f8fd;border-left:4px solid var(--primary);padding:16px;border-radius:10px;line-height:1.7;white-space:pre-wrap}
+    .doc-body{white-space:pre-wrap;line-height:1.75;background:#fbfcfe;border:1px solid var(--line);border-radius:12px;padding:20px;max-height:560px;overflow:auto}
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:50;align-items:center;justify-content:center;padding:20px}
+    .modal-bg.show{display:flex}
+    .modal{width:min(560px,100%);background:#fff;border-radius:16px;box-shadow:0 25px 70px rgba(0,0,0,.2);overflow:hidden}
+    .modal-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+    .modal-head h2{font-size:19px;margin:0}
+    .close{border:0;background:none;font-size:24px;cursor:pointer}
+    .modal-body{padding:20px;display:grid;gap:14px}
+    label{font-size:13px;font-weight:700;color:#344054;display:block;margin-bottom:6px}
+    .field{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .check{display:flex;align-items:center;gap:8px;font-size:14px}
+    .modal-foot{padding:16px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+    .toast{position:fixed;right:22px;bottom:22px;background:#101828;color:#fff;border-radius:10px;padding:13px 16px;display:none;z-index:90}
+    .toast.show{display:block}
+    .error{color:var(--danger)}
+    details.setup{margin-top:22px;border:1px dashed #b8c5d6;border-radius:12px;padding:14px;background:#fafcff}
+    details.setup summary{cursor:pointer;font-weight:700;color:var(--primary)}
+    pre.code{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:14px;border-radius:10px;overflow:auto;font-size:12px;max-height:300px}
+    @media(max-width:850px){
+      .layout{grid-template-columns:1fr}
+      .sidebar{position:static;max-height:none}.doc-list{max-height:330px}
+      header{padding:0 16px}.content{padding:18px}.doc-head{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="logo">D</div><span>업무문서 관리</span></div>
+    <div class="header-actions">
+      <button class="btn btn-light" onclick="loadDocs()">새로고침</button>
+      <button class="btn btn-primary" onclick="openSchedule()">일정체크</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="side-head">
+        <h2>문서 목록 <span id="count" style="color:var(--primary)"></span></h2>
+        <input id="search" class="search" placeholder="문서 제목/분류 검색" oninput="renderList()" />
+      </div>
+      <div id="docList" class="doc-list"></div>
+    </aside>
+
+    <section class="content">
+      <div id="detail" class="empty">
+        <div><b>왼쪽 문서를 선택하세요.</b><br><br>문서 내용과 요약을 확인할 수 있습니다.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="scheduleModal" class="modal-bg" onclick="if(event.target===this) closeSchedule()">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>ChatGPT로 일정 등록 요청</h2>
+      <button class="close" onclick="closeSchedule()">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#f3f8fd;border-left:4px solid var(--primary);padding:14px 16px;border-radius:10px;line-height:1.65">
+        아래 내용을 확인한 뒤 <b>요청문 복사</b> 버튼을 누르고, 현재 ChatGPT 대화창에 붙여넣어 주세요.<br>
+        ChatGPT에서 연결된 <b>Google Calendar</b>와 <b>Gmail</b>을 이용해 일정 등록과 이메일 발송을 요청할 수 있습니다.
+      </div>
+
+      <div>
+        <label>일정 제목</label>
+        <input id="eventTitle" class="field" placeholder="예: 업무지원 개선안 검토" />
+      </div>
+
+      <div>
+        <label>날짜</label>
+        <input id="eventDate" class="field" type="date" />
+      </div>
+
+      <div class="row">
+        <div>
+          <label>시작 시간</label>
+          <input id="startTime" class="field" type="time" value="09:00" />
+        </div>
+        <div>
+          <label>종료 시간</label>
+          <input id="endTime" class="field" type="time" value="10:00" />
+        </div>
+      </div>
+
+      <div>
+        <label>메모</label>
+        <textarea id="eventDesc" class="field" rows="4" placeholder="일정 메모를 입력하세요."></textarea>
+      </div>
+
+      <div>
+        <label>ChatGPT 요청문</label>
+        <textarea id="gptPrompt" class="field" rows="10" readonly></textarea>
+      </div>
+
+      <div id="modalMsg" class="error"></div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn btn-light" onclick="closeSchedule()">닫기</button>
+      <button class="btn btn-light" onclick="refreshGptPrompt()">요청문 새로고침</button>
+      <button class="btn btn-primary" onclick="copyGptPrompt()">요청문 복사</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+  // ===== Supabase =====
+  const SUPABASE_URL = 'https://lqllsxpivccylmwlnpjn.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_qvWkya-l5q8wtb0rn-YBrA_IDFsX7P-';
+
+  let docs = [];
+  let selectedDoc = null;
+
+  const $ = id => document.getElementById(id);
+
+  async function loadDocs() {
+    $('docList').innerHTML = '<div style="padding:18px;color:#6b778c">문서를 불러오는 중...</div>';
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/docs?select=id,title,file_name,file_type,category,content,summary,drive_url,document_date,updated_at&order=id.asc`;
+      const res = await fetch(url, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (!res.ok) throw new Error(`Supabase 조회 실패 (${res.status})`);
+      docs = await res.json();
+      $('count').textContent = `${docs.length}건`;
+      renderList();
+      if (docs.length && !selectedDoc) showDoc(docs[0].id);
+    } catch (e) {
+      $('docList').innerHTML = `<div style="padding:18px" class="error">${escapeHtml(e.message)}<br><small>docs 테이블 SELECT 정책을 확인하세요.</small></div>`;
+    }
+  }
+
+  function renderList() {
+    const q = $('search').value.trim().toLowerCase();
+    const filtered = docs.filter(d =>
+      [d.title,d.category,d.file_type].some(v => (v||'').toLowerCase().includes(q))
+    );
+
+    $('docList').innerHTML = filtered.length ? filtered.map(d => `
+      <div class="doc-item ${selectedDoc?.id===d.id?'active':''}" onclick="showDoc(${d.id})">
+        <div class="title">${escapeHtml(d.title || d.file_name || '제목 없음')}</div>
+        <div class="meta">
+          <span class="badge">${escapeHtml((d.file_type||'DOC').toUpperCase())}</span>
+          <span>${escapeHtml(d.category || '미분류')}</span>
+          ${d.document_date ? `<span>${escapeHtml(d.document_date)}</span>` : ''}
+        </div>
+      </div>
+    `).join('') : '<div style="padding:18px;color:#6b778c">검색 결과가 없습니다.</div>';
+  }
+
+  function showDoc(id) {
+    selectedDoc = docs.find(d => d.id === id);
+    if (!selectedDoc) return;
+    renderList();
+
+    const summary = selectedDoc.summary?.trim()
+      || buildFallbackSummary(selectedDoc.content || '');
+
+    $('detail').className = '';
+    $('detail').innerHTML = `
+      <div class="doc-head">
+        <div>
+          <h1>${escapeHtml(selectedDoc.title || selectedDoc.file_name || '제목 없음')}</h1>
+          <div class="meta">
+            <span class="badge">${escapeHtml((selectedDoc.file_type||'DOC').toUpperCase())}</span>
+            <span>${escapeHtml(selectedDoc.category || '미분류')}</span>
+            ${selectedDoc.document_date ? `<span>문서일: ${escapeHtml(selectedDoc.document_date)}</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${selectedDoc.drive_url ? `<button class="btn btn-light" onclick="window.open('${safeUrl(selectedDoc.drive_url)}','_blank')">원본 열기</button>` : ''}
+          <button class="btn btn-primary" onclick="openSchedule()">일정체크</button>
+        </div>
+      </div>
+      <div class="section">
+        <h3>문서 요약</h3>
+        <div class="summary">${escapeHtml(summary)}</div>
+      </div>
+      <div class="section">
+        <h3>문서 내용</h3>
+        <div class="doc-body">${escapeHtml(selectedDoc.content || '저장된 본문이 없습니다.')}</div>
+      </div>
+    `;
+  }
+
+  function buildFallbackSummary(text) {
+    const cleaned = text.replace(/\s+/g,' ').trim();
+    if (!cleaned) return '등록된 요약이 없습니다.';
+    return cleaned.length > 240 ? cleaned.slice(0, 240) + '…' : cleaned;
+  }
+
+  function openSchedule() {
+    $('modalMsg').textContent = '';
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const d = String(now.getDate()).padStart(2,'0');
+
+    $('eventDate').value = `${y}-${m}-${d}`;
+    $('eventTitle').value = selectedDoc ? `${selectedDoc.title} 검토` : '';
+    $('eventDesc').value = selectedDoc
+      ? `연관 문서: ${selectedDoc.title}
+${selectedDoc.drive_url || ''}`
+      : '';
+
+    refreshGptPrompt();
+    $('scheduleModal').classList.add('show');
+  }
+
+  function closeSchedule() {
+    $('scheduleModal').classList.remove('show');
+  }
+
+  function refreshGptPrompt() {
+    const title = $('eventTitle')?.value.trim() || '';
+    const date = $('eventDate')?.value || '';
+    const startTime = $('startTime')?.value || '';
+    const endTime = $('endTime')?.value || '';
+    const desc = $('eventDesc')?.value.trim() || '';
+
+    const docTitle = selectedDoc?.title || '';
+    const docUrl = selectedDoc?.drive_url || '';
+
+    const prompt = [
+      '다음 일정을 내 Google Calendar에 등록해줘.',
+      '',
+      `일정 제목: ${title || '(입력 필요)'}`,
+      `날짜: ${date || '(입력 필요)'}`,
+      `시간: ${startTime || '(입력 필요)'} ~ ${endTime || '(입력 필요)'}`,
+      docTitle ? `연관 문서: ${docTitle}` : '',
+      docUrl ? `문서 링크: ${docUrl}` : '',
+      desc ? `메모: ${desc}` : '',
+      '',
+      '일정 등록이 완료되면, 등록된 일정의 제목·날짜·시간·연관 문서 정보를 요약해서 내 Gmail로도 보내줘.'
+    ].filter(Boolean).join('\n');
+
+    if ($('gptPrompt')) $('gptPrompt').value = prompt;
+  }
+
+  async function copyGptPrompt() {
+    refreshGptPrompt();
+
+    const title = $('eventTitle').value.trim();
+    const date = $('eventDate').value;
+    const startTime = $('startTime').value;
+    const endTime = $('endTime').value;
+
+    if (!title || !date || !startTime || !endTime) {
+      $('modalMsg').textContent = '제목, 날짜, 시작/종료 시간을 먼저 입력해주세요.';
+      return;
+    }
+
+    if (endTime <= startTime) {
+      $('modalMsg').textContent = '종료 시간은 시작 시간보다 늦어야 합니다.';
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText($('gptPrompt').value);
+      $('modalMsg').textContent = '';
+      showToast('ChatGPT 요청문을 복사했습니다. 이 대화창에 붙여넣어 주세요.');
+    } catch (e) {
+      $('gptPrompt').select();
+      document.execCommand('copy');
+      showToast('ChatGPT 요청문을 복사했습니다. 이 대화창에 붙여넣어 주세요.');
+    }
+  }
+
+  function showToast(msg) {
+    $('toast').textContent = msg;
+    $('toast').classList.add('show');
+    setTimeout(() => $('toast').classList.remove('show'), 2600);
+  }
+
+  function escapeHtml(v='') {
+    return String(v).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function safeUrl(v='') {
+    return /^https:\/\/(drive|docs)\.google\.com\//.test(v) ? v.replace(/'/g,'%27') : '#';
+  }
+
+  ['eventTitle','eventDate','startTime','endTime','eventDesc'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('input', refreshGptPrompt);
+  });
+
+  loadDocs();
+</script>
+</body>
+</html>
